@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "System-wide super admin",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["super_admin"] }
+      },
+      "required": ["email", "role"]
+    },
+    "OrganizationRequest": {
+      "title": "Organization Request",
+      "description": "Request from a company to join the platform",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "hrName": { "type": "string" },
+        "hrEmail": { "type": "string", "format": "email" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["companyName", "hrName", "hrEmail", "status", "createdAt"]
+    },
+    "Organization": {
+      "title": "Organization",
+      "description": "A registered company on the platform",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "hrId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizationId", "companyName", "createdBy", "hrId", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "HR or Employee in an organization",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "hr", "employee"] },
+        "organizationId": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Staff member record",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "name": { "type": "string" },
+        "designation": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "joiningDate": { "type": "string", "format": "date" }
+      },
+      "required": ["employeeId", "name", "designation", "organizationId", "joiningDate"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance record",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["Present", "Absent", "Leave"] },
+        "inTime": { "type": "string" },
+        "outTime": { "type": "string" },
+        "workingHours": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["status", "date"]
+    },
+    "Leave": {
+      "title": "Leave",
+      "description": "Leave request or record",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["employeeId", "type", "date", "status"]
+    }
+  },
+  "firestore": {
+    "admins": {
+      "schema": "Admin",
+      "description": "Global super admins"
+    },
+    "organization_requests": {
+      "schema": "OrganizationRequest",
+      "description": "Pending company signups"
+    },
+    "organizations": {
+      "schema": "Organization",
+      "description": "Active organizations"
+    },
+    "users": {
+      "schema": "User",
+      "description": "Platform users (HR and System Admins)"
+    },
+    "employees": {
+      "schema": "Employee",
+      "description": "Employee profiles per organization"
+    },
+    "attendance": {
+      "schema": "Attendance",
+      "description": "Attendance logs"
+    },
+    "leaves": {
+      "schema": "Leave",
+      "description": "Leave management"
+    }
+  }
+}

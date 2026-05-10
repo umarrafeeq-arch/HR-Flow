@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isAdmin() { 
+      return isSignedIn() && (
+        (request.auth.token.email == "urdigital409@gmail.com" && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      ); 
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isHR() {
+      return isSignedIn() && getUserData().role == "hr";
+    }
+
+    function isHRForOrg(orgId) {
+      return isHR() && getUserData().organizationId == orgId;
+    }
+
+    // 1. Admins Collection
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // 2. Organization Requests
+    match /organization_requests/{requestId} {
+      function isValidRequest(data) {
+        return data.companyName is string && data.companyName.size() <= 200
+          && data.hrName is string && data.hrName.size() <= 200
+          && data.hrEmail is string && data.hrEmail.size() <= 200
+          && data.status in ["pending", "approved", "rejected"];
+      }
+
+      allow create: if isValidId(requestId) && isValidRequest(incoming()) && incoming().status == "pending" && incoming().createdAt == request.time;
+      allow get, list, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // 3. Organizations
+    match /organizations/{orgId} {
+      function isValidOrg(data) {
+        return data.companyName is string && data.companyName.size() <= 200
+          && data.organizationId == orgId
+          && data.hrId is string;
+      }
+      allow get: if isAdmin() || (isSignedIn() && getUserData().organizationId == orgId);
+      allow list: if isAdmin(); // Only admins can list all organizations
+      allow create: if isAdmin() && isValidOrg(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidOrg(incoming());
+      allow delete: if false;
+    }
+
+    // 4. Users (HR profiles)
+    match /users/{uid} {
+      function isValidUser(data) {
+        return data.name is string && data.name.size() <= 200
+          && data.role in ["hr", "admin", "super_admin"]
+          && (data.role == "hr" ? data.organizationId is string : true);
+      }
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == uid);
+      allow create: if isSignedIn() && (isAdmin() || request.auth.uid == uid) && isValidUser(incoming());
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == uid) && isValidUser(incoming()) && incoming().role == existing().role;
+      allow delete: if isAdmin();
+    }
+
+    // 5. Employees
+    match /employees/{employeeId} {
+      function isValidEmployee(data) {
+        return data.name is string && data.name.size() <= 200
+          && data.designation is string
+          && data.organizationId is string;
+      }
+      allow read: if isAdmin() || (isSignedIn() && getUserData().organizationId == existing().organizationId);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.organizationId == getUserData().organizationId);
+      allow create: if isSignedIn() && isHRForOrg(incoming().organizationId) && isValidEmployee(incoming());
+      allow update: if isSignedIn() && isHRForOrg(existing().organizationId) && isValidEmployee(incoming()) && incoming().organizationId == existing().organizationId;
+      allow delete: if isSignedIn() && isHRForOrg(existing().organizationId);
+    }
+
+    // 6. Attendance
+    match /attendance/{atId} {
+      function isValidAttendance(data) {
+        return data.status in ["Present", "Absent", "Leave"]
+          && data.date is string && data.organizationId is string;
+      }
+      allow read: if isAdmin() || (isSignedIn() && getUserData().organizationId == resource.data.organizationId);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.organizationId == getUserData().organizationId);
+      allow create: if isSignedIn() && isHRForOrg(incoming().organizationId) && isValidAttendance(incoming());
+      allow update: if isSignedIn() && isHRForOrg(existing().organizationId) && isValidAttendance(incoming()) && incoming().organizationId == existing().organizationId;
+      allow delete: if isSignedIn() && isHRForOrg(existing().organizationId);
+    }
+
+    // 7. Leaves
+    match /leaves/{leaveId} {
+      allow read: if isAdmin() || (isSignedIn() && getUserData().organizationId == existing().organizationId);
+      allow write: if isSignedIn() && isHRForOrg(incoming().organizationId);
+    }
+  }
+}
